@@ -1,8 +1,8 @@
-# CLAUDE.md — {{PROJECT_NAME}}
+# CLAUDE.md — pki-ca-admin
 
 ## Project Overview
 
-{{PROJECT_DESCRIPTION}}
+Certificate Authority Administration platform for managing multi-tier PKI hierarchies (Root CA → Environment Sub-CAs → Project Sub-CAs → Leaf Certificates). Focus on mTLS, change tracking, and API-driven certificate lifecycle automation. Developer-first, multi-cloud, with audit trail and compliance features.
 
 See @README for project overview.
 
