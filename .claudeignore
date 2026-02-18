@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+vendor/
+.venv/
+__pycache__/
+
+# Build artifacts
+dist/
+build/
+*.min.js
+*.min.css
+*.map
+
+# Terraform state (sensitive)
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large binary files
+*.zip
+*.tar.gz
+*.whl
+*.jar
+
+# Lock files (large, not useful for context)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+Gemfile.lock
+poetry.lock
+Cargo.lock
+go.sum
