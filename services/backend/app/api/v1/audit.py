@@ -40,9 +40,9 @@ async def list_audit_events(
     List audit events with filtering and pagination.
     """
     try:
-        # Build query
+        # Build query with tenant filtering
         query = select(AuditEvent)
-        conditions = []
+        conditions = [AuditEvent.tenant_id == current_user.tenant_id]
         
         # Apply filters
         if event_type:
@@ -133,40 +133,41 @@ async def get_audit_stats(
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)
         
-        # Total events in period
+        # Total events in period (with tenant filtering)
+        tenant_filter = AuditEvent.tenant_id == current_user.tenant_id
         total_query = select(func.count()).select_from(AuditEvent).where(
-            AuditEvent.created_at >= start_date
+            and_(tenant_filter, AuditEvent.created_at >= start_date)
         )
         total_events = (await db.execute(total_query)).scalar()
         
-        # Events by category
+        # Events by category (with tenant filtering)
         category_query = select(
             AuditEvent.event_category,
             func.count()
         ).where(
-            AuditEvent.created_at >= start_date
+            and_(tenant_filter, AuditEvent.created_at >= start_date)
         ).group_by(AuditEvent.event_category)
         
         category_result = await db.execute(category_query)
         events_by_category = {row[0] or "unknown": row[1] for row in category_result}
         
-        # Events by severity
+        # Events by severity (with tenant filtering)
         severity_query = select(
             AuditEvent.severity,
             func.count()
         ).where(
-            AuditEvent.created_at >= start_date
+            and_(tenant_filter, AuditEvent.created_at >= start_date)
         ).group_by(AuditEvent.severity)
         
         severity_result = await db.execute(severity_query)
         events_by_severity = {row[0] or "unknown": row[1] for row in severity_result}
         
-        # Events by type (top 10)
+        # Events by type (top 10, with tenant filtering)
         type_query = select(
             AuditEvent.event_type,
             func.count()
         ).where(
-            AuditEvent.created_at >= start_date
+            and_(tenant_filter, AuditEvent.created_at >= start_date)
         ).group_by(AuditEvent.event_type).order_by(func.count().desc()).limit(10)
         
         type_result = await db.execute(type_query)
@@ -177,21 +178,25 @@ async def get_audit_stats(
         daily_query = text("""
             SELECT DATE(created_at) as event_date, COUNT(*) as event_count
             FROM audit_events 
-            WHERE created_at >= :start_date
+            WHERE created_at >= :start_date AND tenant_id = :tenant_id
             GROUP BY DATE(created_at)
             ORDER BY event_date DESC
             LIMIT 30
         """)
         
-        daily_result = await db.execute(daily_query, {"start_date": start_date})
+        daily_result = await db.execute(daily_query, {
+            "start_date": start_date,
+            "tenant_id": current_user.tenant_id
+        })
         events_by_day = {row[0].isoformat(): row[1] for row in daily_result}
         
-        # Top actors (top 10)
+        # Top actors (top 10, with tenant filtering)
         actor_query = select(
             AuditEvent.actor_id,
             func.count()
         ).where(
             and_(
+                tenant_filter,
                 AuditEvent.created_at >= start_date,
                 AuditEvent.actor_id.is_not(None)
             )

@@ -42,6 +42,8 @@ services:
       - --import-realm
     volumes:
       - ../keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ../keycloak/realm-team-alpha.json:/opt/keycloak/data/import/realm-team-alpha.json
+      - ../keycloak/realm-team-beta.json:/opt/keycloak/data/import/realm-team-beta.json
 
   backend:
     build:

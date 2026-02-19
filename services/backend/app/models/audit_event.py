@@ -20,6 +20,9 @@ class AuditEvent(Base):
     # Primary key (BigInt for high volume)
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     
+    # Multi-tenancy
+    tenant_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    
     # Event classification
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)  # ca.created, cert.issued, cert.revoked
     event_category: Mapped[Optional[str]] = mapped_column(String(50))  # security, operational, administrative
@@ -48,11 +51,12 @@ class AuditEvent(Base):
     
     # Indexes for performance
     __table_args__ = (
-        Index("ix_audit_events_created_at", "created_at"),
-        Index("ix_audit_events_event_type", "event_type"),
-        Index("ix_audit_events_entity", "entity_type", "entity_id"),
-        Index("ix_audit_events_actor", "actor_type", "actor_id"),
-        Index("ix_audit_events_severity", "severity"),
+        Index("ix_audit_events_tenant_created_at", "tenant_id", "created_at"),
+        Index("ix_audit_events_tenant_event_type", "tenant_id", "event_type"),
+        Index("ix_audit_events_tenant_entity", "tenant_id", "entity_type", "entity_id"),
+        Index("ix_audit_events_tenant_actor", "tenant_id", "actor_type", "actor_id"),
+        Index("ix_audit_events_tenant_severity", "tenant_id", "severity"),
+        Index("ix_audit_events_tenant_id", "tenant_id"),
     )
     
     def __repr__(self) -> str:
@@ -62,6 +66,7 @@ class AuditEvent(Base):
     def create_ca_event(
         cls,
         event_type: str,
+        tenant_id: str,
         ca_id: uuid.UUID,
         actor_id: Optional[str] = None,
         actor_ip: Optional[str] = None,
@@ -74,6 +79,7 @@ class AuditEvent(Base):
         
         Args:
             event_type: Type of event (e.g., 'ca.created', 'ca.revoked')
+            tenant_id: Tenant identifier (Keycloak realm)
             ca_id: CA UUID
             actor_id: User or system that performed the action
             actor_ip: IP address of the actor
@@ -85,6 +91,7 @@ class AuditEvent(Base):
             AuditEvent: New audit event instance
         """
         return cls(
+            tenant_id=tenant_id,
             event_type=event_type,
             event_category="operational",
             severity="info",
@@ -102,6 +109,7 @@ class AuditEvent(Base):
     def create_certificate_event(
         cls,
         event_type: str,
+        tenant_id: str,
         certificate_id: uuid.UUID,
         actor_id: Optional[str] = None,
         actor_ip: Optional[str] = None,
@@ -114,6 +122,7 @@ class AuditEvent(Base):
         
         Args:
             event_type: Type of event (e.g., 'cert.issued', 'cert.revoked')
+            tenant_id: Tenant identifier (Keycloak realm)
             certificate_id: Certificate UUID
             actor_id: User or system that performed the action
             actor_ip: IP address of the actor
@@ -131,6 +140,7 @@ class AuditEvent(Base):
             severity = "error"
         
         return cls(
+            tenant_id=tenant_id,
             event_type=event_type,
             event_category="operational",
             severity=severity,
@@ -148,6 +158,7 @@ class AuditEvent(Base):
     def create_security_event(
         cls,
         event_type: str,
+        tenant_id: str,
         entity_id: uuid.UUID,
         actor_id: Optional[str] = None,
         actor_ip: Optional[str] = None,
@@ -160,6 +171,7 @@ class AuditEvent(Base):
         
         Args:
             event_type: Type of event (e.g., 'auth.failed', 'access.denied')
+            tenant_id: Tenant identifier (Keycloak realm)
             entity_id: Related entity UUID
             actor_id: User or system that performed the action
             actor_ip: IP address of the actor
@@ -171,6 +183,7 @@ class AuditEvent(Base):
             AuditEvent: New audit event instance
         """
         return cls(
+            tenant_id=tenant_id,
             event_type=event_type,
             event_category="security",
             severity=severity,

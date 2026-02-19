@@ -11,7 +11,7 @@ import structlog
 
 from app.models.database import CertificateAuthority, Organization
 from app.models.schemas import CACreate, CAUpdate, CASubject
-from app.services.stepca_service import StepCAService, StepCAInstance, StepCAException
+# Removed step-ca dependency - using native PKI implementation
 from app.core.config import settings
 
 logger = structlog.get_logger()
@@ -397,41 +397,14 @@ async def _generate_ca_crypto_operations(ca: CertificateAuthority):
                     ca_id=str(ca.id)
                 )
         
-        # Create and start step-ca instance
-        try:
-            stepca_service = StepCAService()
-            stepca_instance = StepCAInstance(ca)
-            
-            logger.info(
-                "Creating step-ca instance for CA",
-                ca_id=str(ca.id),
-                ca_name=ca.name
-            )
-            
-            # Create step-ca configuration and instance
-            await stepca_service.create_instance(stepca_instance, certificate, private_key)
-            
-            # Start the step-ca instance
-            await stepca_service.start_instance(stepca_instance)
-            
-            # Mark CA as active only after step-ca is running
-            ca.status = "active"
-            
-            logger.info(
-                "step-ca instance created and started successfully",
-                ca_id=str(ca.id),
-                stepca_port=stepca_instance.port,
-                stepca_address=stepca_instance.address
-            )
-            
-        except StepCAException as e:
-            ca.status = "failed"
-            logger.error(
-                "Failed to create step-ca instance",
-                ca_id=str(ca.id),
-                error=str(e)
-            )
-            raise
+        # Mark CA as active (using native PKI implementation)
+        ca.status = "active"
+        
+        logger.info(
+            "CA created successfully with native PKI implementation",
+            ca_id=str(ca.id),
+            ca_name=ca.name
+        )
         
         logger.info(
             "CA cryptographic operations completed",

@@ -42,8 +42,8 @@ async def list_cas(
     List certificate authorities with pagination and filtering.
     """
     try:
-        # Build query
-        query = select(CaNode)
+        # Build query with tenant filtering
+        query = select(CaNode).where(CaNode.tenant_id == current_user.tenant_id)
         
         # Apply filters
         if type:
@@ -52,7 +52,7 @@ async def list_cas(
             query = query.where(CaNode.status == status)
         
         # Count total records
-        count_query = select(func.count()).select_from(CaNode)
+        count_query = select(func.count()).select_from(CaNode).where(CaNode.tenant_id == current_user.tenant_id)
         if type:
             count_query = count_query.where(CaNode.type == type)
         if status:
@@ -132,8 +132,8 @@ async def get_ca_tree(
     Get the complete CA hierarchy tree.
     """
     try:
-        # Get all CAs with their relationships
-        query = select(CaNode).options(selectinload(CaNode.children)).order_by(CaNode.created_at)
+        # Get all CAs with their relationships (filtered by tenant)
+        query = select(CaNode).where(CaNode.tenant_id == current_user.tenant_id).options(selectinload(CaNode.children)).order_by(CaNode.created_at)
         result = await db.execute(query)
         all_cas = result.scalars().all()
         
@@ -209,11 +209,12 @@ async def get_ca_stats(
     Get certificate authority statistics.
     """
     try:
-        # CA statistics
-        total_cas_query = select(func.count()).select_from(CaNode)
-        root_cas_query = select(func.count()).select_from(CaNode).where(CaNode.type == "root")
-        intermediate_cas_query = select(func.count()).select_from(CaNode).where(CaNode.type == "intermediate")
-        active_cas_query = select(func.count()).select_from(CaNode).where(CaNode.status == "active")
+        # CA statistics (filtered by tenant)
+        base_ca_filter = CaNode.tenant_id == current_user.tenant_id
+        total_cas_query = select(func.count()).select_from(CaNode).where(base_ca_filter)
+        root_cas_query = select(func.count()).select_from(CaNode).where(and_(base_ca_filter, CaNode.type == "root"))
+        intermediate_cas_query = select(func.count()).select_from(CaNode).where(and_(base_ca_filter, CaNode.type == "intermediate"))
+        active_cas_query = select(func.count()).select_from(CaNode).where(and_(base_ca_filter, CaNode.status == "active"))
         
         total_cas = (await db.execute(total_cas_query)).scalar()
         root_cas = (await db.execute(root_cas_query)).scalar()
@@ -222,14 +223,15 @@ async def get_ca_stats(
         
         # Expired and expiring CAs
         now = datetime.utcnow()
-        expired_cas_query = select(func.count()).select_from(CaNode).where(CaNode.not_after < now)
+        expired_cas_query = select(func.count()).select_from(CaNode).where(and_(base_ca_filter, CaNode.not_after < now))
         expired_cas = (await db.execute(expired_cas_query)).scalar()
         
-        # Certificate statistics
-        total_certs_query = select(func.count()).select_from(Certificate)
-        active_certs_query = select(func.count()).select_from(Certificate).where(Certificate.status == "active")
-        expired_certs_query = select(func.count()).select_from(Certificate).where(Certificate.not_after < now)
-        revoked_certs_query = select(func.count()).select_from(Certificate).where(Certificate.status == "revoked")
+        # Certificate statistics (filtered by tenant)
+        base_cert_filter = Certificate.tenant_id == current_user.tenant_id
+        total_certs_query = select(func.count()).select_from(Certificate).where(base_cert_filter)
+        active_certs_query = select(func.count()).select_from(Certificate).where(and_(base_cert_filter, Certificate.status == "active"))
+        expired_certs_query = select(func.count()).select_from(Certificate).where(and_(base_cert_filter, Certificate.not_after < now))
+        revoked_certs_query = select(func.count()).select_from(Certificate).where(and_(base_cert_filter, Certificate.status == "revoked"))
         
         total_certificates = (await db.execute(total_certs_query)).scalar()
         active_certificates = (await db.execute(active_certs_query)).scalar()
@@ -269,7 +271,7 @@ async def get_ca(
     Get a specific certificate authority by ID.
     """
     try:
-        query = select(CaNode).where(CaNode.id == ca_id)
+        query = select(CaNode).where(and_(CaNode.id == ca_id, CaNode.tenant_id == current_user.tenant_id))
         result = await db.execute(query)
         ca = result.scalar_one_or_none()
         
@@ -343,7 +345,7 @@ async def create_ca(
                     detail="Intermediate CAs must have a parent CA"
                 )
             
-            parent_query = select(CaNode).where(CaNode.id == ca_create.parent_ca_id)
+            parent_query = select(CaNode).where(and_(CaNode.id == ca_create.parent_ca_id, CaNode.tenant_id == current_user.tenant_id))
             parent_result = await db.execute(parent_query)
             parent_ca = parent_result.scalar_one_or_none()
             
@@ -395,6 +397,7 @@ async def create_ca(
         
         # Create CA record
         ca = CaNode(
+            tenant_id=current_user.tenant_id,
             name=ca_create.name,
             description=ca_create.description,
             type=ca_create.type,
@@ -424,6 +427,7 @@ async def create_ca(
             event_type="ca.created",
             ca_id=ca.id,
             actor_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
             event_data={
                 "ca_name": ca.name,
                 "ca_type": ca.type,
@@ -497,7 +501,7 @@ async def update_ca(
     Update a certificate authority.
     """
     try:
-        query = select(CaNode).where(CaNode.id == ca_id)
+        query = select(CaNode).where(and_(CaNode.id == ca_id, CaNode.tenant_id == current_user.tenant_id))
         result = await db.execute(query)
         ca = result.scalar_one_or_none()
         
@@ -546,6 +550,7 @@ async def update_ca(
                 event_type="ca.updated",
                 ca_id=ca.id,
                 actor_id=current_user.user_id,
+                tenant_id=current_user.tenant_id,
                 event_data={"ca_name": ca.name},
                 changes=changes
             )
@@ -610,7 +615,7 @@ async def delete_ca(
     This sets the status to 'revoked' rather than physically deleting.
     """
     try:
-        query = select(CaNode).where(CaNode.id == ca_id)
+        query = select(CaNode).where(and_(CaNode.id == ca_id, CaNode.tenant_id == current_user.tenant_id))
         result = await db.execute(query)
         ca = result.scalar_one_or_none()
         
@@ -622,7 +627,7 @@ async def delete_ca(
         
         # Check if CA has active children
         children_query = select(func.count()).select_from(CaNode).where(
-            and_(CaNode.parent_ca_id == ca_id, CaNode.status == "active")
+            and_(CaNode.parent_ca_id == ca_id, CaNode.status == "active", CaNode.tenant_id == current_user.tenant_id)
         )
         children_count = (await db.execute(children_query)).scalar()
         
@@ -643,6 +648,7 @@ async def delete_ca(
             event_type="ca.revoked",
             ca_id=ca.id,
             actor_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
             event_data={"ca_name": ca.name, "reason": "administrative_deletion"}
         )
         db.add(audit_event)

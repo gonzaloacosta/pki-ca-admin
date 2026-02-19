@@ -136,13 +136,35 @@ class CurrentUser:
         self.last_name: str = payload.get("family_name", "")
         self.full_name: str = f"{self.first_name} {self.last_name}".strip()
         
+        # Extract tenant from issuer (Keycloak realm)
+        issuer = payload.get("iss", "")
+        self.tenant_id: str = self._extract_tenant_from_issuer(issuer)
+        
         # Extract roles from realm_access
         realm_access = payload.get("realm_access", {})
         self.roles: List[str] = realm_access.get("roles", [])
         
-        # Organization info (if available)
+        # Extract groups from groups claim
+        self.groups: List[str] = payload.get("groups", [])
+        
+        # Organization info (legacy - keeping for backward compatibility)
         self.organization_id: Optional[str] = payload.get("org_id")
         self.organization_domain: Optional[str] = payload.get("org_domain")
+    
+    def _extract_tenant_from_issuer(self, issuer: str) -> str:
+        """
+        Extract tenant ID from Keycloak issuer URL.
+        
+        Example: http://keycloak:8080/realms/team-alpha -> team-alpha
+        """
+        if not issuer:
+            return "default"
+        
+        parts = issuer.rstrip('/').split('/')
+        if len(parts) >= 2 and parts[-2] == 'realms':
+            return parts[-1]
+        
+        return "default"
     
     def has_role(self, role: str) -> bool:
         """Check if user has a specific role."""
@@ -155,6 +177,33 @@ class CurrentUser:
     def has_all_roles(self, roles: List[str]) -> bool:
         """Check if user has all of the specified roles."""
         return all(role in self.roles for role in roles)
+    
+    def has_group(self, group: str) -> bool:
+        """Check if user belongs to a specific group."""
+        return group in self.groups
+    
+    def has_any_group(self, groups: List[str]) -> bool:
+        """Check if user belongs to any of the specified groups."""
+        return any(group in self.groups for group in groups)
+    
+    def has_all_groups(self, groups: List[str]) -> bool:
+        """Check if user belongs to all of the specified groups."""
+        return all(group in self.groups for group in groups)
+    
+    def can_access_ca_scope(self, ca_groups: Optional[List[str]] = None) -> bool:
+        """
+        Check if user can access CAs with the given group scoping.
+        
+        Args:
+            ca_groups: List of groups that have access to the CA (None = no restrictions)
+            
+        Returns:
+            bool: True if user can access the CA
+        """
+        if not ca_groups:
+            return True  # No group restrictions
+        
+        return self.has_any_group(ca_groups)
     
     @property
     def is_admin(self) -> bool:

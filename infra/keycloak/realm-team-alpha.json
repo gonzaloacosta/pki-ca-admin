@@ -1,0 +1,198 @@
+{
+  "realm": "team-alpha",
+  "displayName": "Team Alpha PKI",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>Team Alpha PKI</span></div>",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 30,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "PKI Administrator - full access to all CA operations",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "team-alpha"
+      },
+      {
+        "name": "operator",
+        "description": "PKI Operator - can issue and revoke certificates",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "team-alpha"
+      },
+      {
+        "name": "viewer",
+        "description": "PKI Viewer - read-only access to certificates and CAs",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "team-alpha"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "dev",
+      "path": "/dev",
+      "attributes": {
+        "description": ["Development environment group"]
+      },
+      "realmRoles": ["operator"],
+      "subGroups": []
+    },
+    {
+      "name": "staging",
+      "path": "/staging",
+      "attributes": {
+        "description": ["Staging environment group"]
+      },
+      "realmRoles": ["operator"],
+      "subGroups": []
+    },
+    {
+      "name": "prod",
+      "path": "/prod",
+      "attributes": {
+        "description": ["Production environment group"]
+      },
+      "realmRoles": ["admin"],
+      "subGroups": []
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "pki-api",
+      "name": "PKI API Client",
+      "description": "Client for PKI CA Admin API access",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "pki-api-client-secret",
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "3600",
+        "client_credentials.use_refresh_token": "false"
+      },
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": ["web-origins", "role_list", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt", "groups"],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alpha-admin",
+      "email": "admin@team-alpha.com",
+      "firstName": "Alpha",
+      "lastName": "Administrator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alpha-admin-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"],
+      "groups": ["/prod"]
+    },
+    {
+      "username": "alpha-dev-ops",
+      "email": "devops@team-alpha.com",
+      "firstName": "Alpha",
+      "lastName": "DevOps",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alpha-devops-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["operator"],
+      "groups": ["/dev", "/staging"]
+    },
+    {
+      "username": "alpha-developer",
+      "email": "dev@team-alpha.com",
+      "firstName": "Alpha",
+      "lastName": "Developer",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alpha-dev-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["viewer"],
+      "groups": ["/dev"]
+    }
+  ],
+  "scopeMappings": [],
+  "clientScopeMappings": {},
+  "defaultDefaultClientScopes": ["role_list", "profile", "email", "web-origins"],
+  "defaultOptionalClientScopes": ["offline_access", "address", "phone", "microprofile-jwt", "groups"],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "xXSSProtection": "1; mode=block",
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';"
+  },
+  "smtpServer": {},
+  "internationalizationEnabled": false,
+  "supportedLocales": [],
+  "defaultLocale": "",
+  "authenticationFlows": [],
+  "authenticatorConfig": [],
+  "requiredActions": [],
+  "browserFlow": "browser",
+  "registrationFlow": "registration",
+  "directGrantFlow": "direct grant",
+  "resetCredentialsFlow": "reset credentials",
+  "clientAuthenticationFlow": "clients",
+  "dockerAuthenticationFlow": "docker auth",
+  "attributes": {},
+  "keycloakVersion": "24.0.3"
+}

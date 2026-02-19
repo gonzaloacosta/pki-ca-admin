@@ -46,8 +46,8 @@ async def list_certificates(
     List certificates with pagination and filtering.
     """
     try:
-        # Build query
-        query = select(Certificate).options(selectinload(Certificate.ca))
+        # Build query with tenant filtering
+        query = select(Certificate).options(selectinload(Certificate.ca)).where(Certificate.tenant_id == current_user.tenant_id)
         
         # Apply filters
         if ca_id:
@@ -60,7 +60,7 @@ async def list_certificates(
             query = query.where(Certificate.common_name.ilike(f"%{common_name}%"))
         
         # Count total records
-        count_query = select(func.count()).select_from(Certificate)
+        count_query = select(func.count()).select_from(Certificate).where(Certificate.tenant_id == current_user.tenant_id)
         if ca_id:
             count_query = count_query.where(Certificate.ca_id == ca_id)
         if certificate_type:
@@ -146,27 +146,30 @@ async def get_certificate_stats(
     try:
         now = datetime.utcnow()
         
-        # Basic counts
-        total_certs_query = select(func.count()).select_from(Certificate)
-        active_certs_query = select(func.count()).select_from(Certificate).where(Certificate.status == "active")
-        expired_certs_query = select(func.count()).select_from(Certificate).where(Certificate.not_after < now)
-        revoked_certs_query = select(func.count()).select_from(Certificate).where(Certificate.status == "revoked")
+        # Basic counts (with tenant filtering)
+        tenant_filter = Certificate.tenant_id == current_user.tenant_id
+        total_certs_query = select(func.count()).select_from(Certificate).where(tenant_filter)
+        active_certs_query = select(func.count()).select_from(Certificate).where(and_(tenant_filter, Certificate.status == "active"))
+        expired_certs_query = select(func.count()).select_from(Certificate).where(and_(tenant_filter, Certificate.not_after < now))
+        revoked_certs_query = select(func.count()).select_from(Certificate).where(and_(tenant_filter, Certificate.status == "revoked"))
         
         total_certificates = (await db.execute(total_certs_query)).scalar()
         active_certificates = (await db.execute(active_certs_query)).scalar()
         expired_certificates = (await db.execute(expired_certs_query)).scalar()
         revoked_certificates = (await db.execute(revoked_certs_query)).scalar()
         
-        # Expiring certificates
+        # Expiring certificates (with tenant filtering)
         from datetime import timedelta
         expires_30_query = select(func.count()).select_from(Certificate).where(
             and_(
+                tenant_filter,
                 Certificate.not_after > now,
                 Certificate.not_after <= now + timedelta(days=30)
             )
         )
         expires_90_query = select(func.count()).select_from(Certificate).where(
             and_(
+                tenant_filter,
                 Certificate.not_after > now,
                 Certificate.not_after <= now + timedelta(days=90)
             )
@@ -204,7 +207,7 @@ async def get_certificate(
     Get a specific certificate by ID.
     """
     try:
-        query = select(Certificate).options(selectinload(Certificate.ca)).where(Certificate.id == certificate_id)
+        query = select(Certificate).options(selectinload(Certificate.ca)).where(and_(Certificate.id == certificate_id, Certificate.tenant_id == current_user.tenant_id))
         result = await db.execute(query)
         cert = result.scalar_one_or_none()
         
@@ -270,8 +273,8 @@ async def issue_certificate(
     Issue a new certificate using a CA.
     """
     try:
-        # Get the CA
-        ca_query = select(CaNode).where(CaNode.id == ca_id)
+        # Get the CA (with tenant filtering)
+        ca_query = select(CaNode).where(and_(CaNode.id == ca_id, CaNode.tenant_id == current_user.tenant_id))
         ca_result = await db.execute(ca_query)
         ca = ca_result.scalar_one_or_none()
         
@@ -327,6 +330,7 @@ async def issue_certificate(
         
         # Create certificate record
         certificate = Certificate(
+            tenant_id=current_user.tenant_id,
             ca_id=ca_id,
             serial_number=str(cert.serial_number),
             fingerprint_sha256=fingerprint,
@@ -353,6 +357,7 @@ async def issue_certificate(
         # Create audit event
         audit_event = AuditEvent.create_certificate_event(
             event_type="cert.issued",
+            tenant_id=current_user.tenant_id,
             certificate_id=certificate.id,
             actor_id=current_user.user_id,
             event_data={
@@ -429,8 +434,8 @@ async def sign_csr(
     Sign a Certificate Signing Request (CSR) with a CA.
     """
     try:
-        # Get the CA
-        ca_query = select(CaNode).where(CaNode.id == ca_id)
+        # Get the CA (with tenant filtering)
+        ca_query = select(CaNode).where(and_(CaNode.id == ca_id, CaNode.tenant_id == current_user.tenant_id))
         ca_result = await db.execute(ca_query)
         ca = ca_result.scalar_one_or_none()
         
@@ -472,6 +477,7 @@ async def sign_csr(
         
         # Create certificate record
         certificate = Certificate(
+            tenant_id=current_user.tenant_id,
             ca_id=ca_id,
             serial_number=str(cert.serial_number),
             fingerprint_sha256=fingerprint,
@@ -497,6 +503,7 @@ async def sign_csr(
         # Create audit event
         audit_event = AuditEvent.create_certificate_event(
             event_type="cert.signed_csr",
+            tenant_id=current_user.tenant_id,
             certificate_id=certificate.id,
             actor_id=current_user.user_id,
             event_data={
@@ -574,7 +581,7 @@ async def revoke_certificate(
     """
     try:
         # Get the certificate
-        query = select(Certificate).where(Certificate.id == certificate_id)
+        query = select(Certificate).where(and_(Certificate.id == certificate_id, Certificate.tenant_id == current_user.tenant_id))
         result = await db.execute(query)
         cert = result.scalar_one_or_none()
         
@@ -602,6 +609,7 @@ async def revoke_certificate(
         # Create audit event
         audit_event = AuditEvent.create_certificate_event(
             event_type="cert.revoked",
+            tenant_id=current_user.tenant_id,
             certificate_id=certificate_id,
             actor_id=current_user.user_id,
             event_data={
