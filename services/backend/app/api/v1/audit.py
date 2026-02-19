@@ -231,7 +231,7 @@ async def get_audit_event(
     Get a specific audit event by ID.
     """
     try:
-        query = select(AuditEvent).where(AuditEvent.id == event_id)
+        query = select(AuditEvent).where(and_(AuditEvent.id == event_id, AuditEvent.tenant_id == current_user.tenant_id))
         result = await db.execute(query)
         event = result.scalar_one_or_none()
         
@@ -280,9 +280,9 @@ async def search_audit_events(
     Search audit events with complex filtering.
     """
     try:
-        # Build query
+        # Build query with tenant filtering
         query = select(AuditEvent)
-        conditions = []
+        conditions = [AuditEvent.tenant_id == current_user.tenant_id]
         
         # Apply filters from search request
         if search_request.event_type:

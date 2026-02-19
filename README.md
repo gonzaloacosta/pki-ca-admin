@@ -4,9 +4,42 @@
 
 ## Quick Start
 
-```bash
-# TODO: Add setup instructions
-```
+1. Start the development environment:
+   ```bash
+   docker compose -f infra/docker/docker-compose.dev.yml up -d
+   ```
+
+2. The services will be available at:
+   - **FastAPI Backend**: http://localhost:8000
+   - **API Documentation**: http://localhost:8000/docs
+   - **Keycloak Admin**: http://localhost:8080 (admin/admin)
+   - **PostgreSQL**: localhost:5432 (pki/pki_dev)
+
+3. **Multi-Tenant Setup**: The system includes multiple Keycloak realms:
+   - **Default realm** (`pki-ca-admin`): Basic setup with admin/operator/viewer users
+   - **Team Alpha** (`team-alpha`): Example team realm with dev/staging/prod groups
+   - **Team Beta** (`team-beta`): Example team realm with dev/staging/prod groups
+
+4. **Test Users by Realm**:
+   
+   **Team Alpha (realm: team-alpha)**:
+   - `alpha-admin` / `alpha-admin-123` (admin role, prod group)
+   - `alpha-dev-ops` / `alpha-devops-123` (operator role, dev+staging groups)
+   - `alpha-developer` / `alpha-dev-123` (viewer role, dev group)
+   
+   **Team Beta (realm: team-beta)**:
+   - `beta-admin` / `beta-admin-123` (admin role, prod group)
+   - `beta-staging-ops` / `beta-staging-123` (operator role, staging group)
+   - `beta-viewer` / `beta-viewer-123` (viewer role, all groups)
+
+5. Access the API documentation at http://localhost:8000/docs to explore the endpoints.
+
+## Multi-Tenancy Architecture
+
+- **Realm = Tenant**: Each Keycloak realm represents a separate tenant with complete isolation
+- **Groups = CA Scope**: Groups within a realm determine which CAs a user can access
+- **Roles = Permissions**: Roles define what actions a user can perform (admin/operator/viewer)
+- **Database Isolation**: All data is filtered by `tenant_id` extracted from JWT token realm
 
 ## Architecture
 
