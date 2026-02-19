@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: pki_ca_admin
+      POSTGRES_USER: pki_admin
+      POSTGRES_PASSWORD: pki_admin
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pki_admin -d pki_ca_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching/sessions
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./services/backend
+      dockerfile: Dockerfile
+    environment:
+      DEBUG: "true"
+      DATABASE_URL: "postgresql+asyncpg://pki_admin:pki_admin@db:5432/pki_ca_admin"
+      SECRET_KEY: "dev-secret-key-change-in-production"
+      JWT_SECRET_KEY: "dev-jwt-secret-change-in-production"
+      ALLOWED_HOSTS: '["localhost", "127.0.0.1", "0.0.0.0", "backend"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Frontend (placeholder)
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./services/frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Development tools
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: pki-ca-admin
+    driver: bridge

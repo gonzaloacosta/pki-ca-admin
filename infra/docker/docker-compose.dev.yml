@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: pki-postgres-dev
+    environment:
+      POSTGRES_DB: pki_ca_admin
+      POSTGRES_USER: pki
+      POSTGRES_PASSWORD: pki_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pki -d pki_ca_admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: pki-keycloak-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/pki_ca_admin
+      KC_DB_USERNAME: pki
+      KC_DB_PASSWORD: pki_dev
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT_HTTPS: false
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: 
+      - start-dev
+      - --import-realm
+    volumes:
+      - ../keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+
+  backend:
+    build:
+      context: ../../services/backend
+      dockerfile: Dockerfile
+    container_name: pki-backend-dev
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pki:pki_dev@postgres:5432/pki_ca_admin
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: pki-ca-admin
+      KEYCLOAK_CLIENT_ID: pki-api
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../services/backend:/app
+      - /app/__pycache__
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
