@@ -184,8 +184,14 @@ class FileKeyBackend(KeyBackend):
                 "encrypted_key": private_key_bytes.decode('utf-8')
             }
             
-            with open(key_file, 'w', mode=0o600) as f:
+            with open(key_file, 'w') as f:
                 json.dump(key_data, f, indent=2)
+
+            # Restrict file permissions (best-effort on Windows)
+            try:
+                key_file.chmod(0o600)
+            except OSError:
+                pass
             
             # Update metadata
             await self._update_metadata(key_reference, {

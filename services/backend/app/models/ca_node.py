@@ -3,7 +3,7 @@ Certificate Authority Node model.
 """
 
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Text, DateTime, Boolean, Integer, ForeignKey, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
@@ -76,7 +76,6 @@ class CaNode(Base):
         Index("ix_ca_nodes_tenant_status", "tenant_id", "status"),
         Index("ix_ca_nodes_parent_id", "parent_ca_id"),
         Index("ix_ca_nodes_not_after", "not_after"),
-        Index("ix_ca_nodes_tenant_id", "tenant_id"),
     )
     
     def __repr__(self) -> str:
@@ -97,14 +96,14 @@ class CaNode(Base):
         """Check if the CA certificate has expired."""
         if not self.not_after:
             return False
-        return self.not_after < datetime.utcnow()
-    
+        return self.not_after < datetime.now(timezone.utc)
+
     @property
     def is_expiring_soon(self) -> bool:
         """Check if the CA certificate is expiring within the renewal threshold."""
         if not self.not_after:
             return False
-        days_until_expiry = (self.not_after - datetime.utcnow()).days
+        days_until_expiry = (self.not_after - datetime.now(timezone.utc)).days
         return days_until_expiry <= self.renewal_threshold_days
     
     def get_full_chain(self) -> List["CaNode"]:

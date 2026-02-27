@@ -2,7 +2,7 @@
 Pydantic schemas for Audit operations.
 """
 
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
 import uuid
