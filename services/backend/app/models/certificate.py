@@ -80,7 +80,6 @@ class Certificate(Base):
         Index("ix_certificates_tenant_status", "tenant_id", "status"),
         Index("ix_certificates_tenant_common_name", "tenant_id", "common_name"),
         Index("ix_certificates_tenant_type", "tenant_id", "certificate_type"),
-        Index("ix_certificates_tenant_id", "tenant_id"),
     )
     
     def __repr__(self) -> str:

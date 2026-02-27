@@ -56,7 +56,6 @@ class AuditEvent(Base):
         Index("ix_audit_events_tenant_entity", "tenant_id", "entity_type", "entity_id"),
         Index("ix_audit_events_tenant_actor", "tenant_id", "actor_type", "actor_id"),
         Index("ix_audit_events_tenant_severity", "tenant_id", "severity"),
-        Index("ix_audit_events_tenant_id", "tenant_id"),
     )
     
     def __repr__(self) -> str:

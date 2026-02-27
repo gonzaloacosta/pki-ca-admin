@@ -45,6 +45,13 @@ coverage/
 .nyc_output/
 htmlcov/
 
+# Private keys and certificate data (NEVER commit key material)
+*.key
+*.pem.key
+data/keys/
+data/certs/
+services/backend/data/
+
 # Claude Code local (personal, not shared)
 CLAUDE.local.md
 .claude/settings.local.json
